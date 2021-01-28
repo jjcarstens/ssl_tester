@@ -32,8 +32,8 @@ defmodule SSLTester.Certs do
 
   def server_ssl_opts(%__MODULE__{} = certs) do
     [
-      fail_if_no_peer_cert: true,
-      verify: :verify_peer,
+      #fail_if_no_peer_cert: true,
+      #verify: :verify_peer,
       # cacerts is temporary
       cacerts: [X509.Certificate.to_der(certs.ca_cert)]
     ]
