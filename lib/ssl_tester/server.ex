@@ -13,9 +13,9 @@ defmodule SSLTester.Server do
   * `:response` - the data to send back to clients when a successful connection
     is established (default: "OK")
   """
-  @spec start_link({X509.Test.Suite.t(), Keyword.t()}) :: GenServer.on_start()
-  def start_link({suite, opts}) do
-    GenServer.start_link(__MODULE__, [suite, opts])
+  @spec start_link(Keyword.t()) :: GenServer.on_start()
+  def start_link(opts) do
+    GenServer.start_link(__MODULE__, opts)
   end
 
   @doc """
@@ -31,20 +31,20 @@ defmodule SSLTester.Server do
 
   defmodule State do
     @moduledoc false
-    defstruct [:listen_socket, :port, :suite, :response]
+    defstruct [:listen_socket, :port, :ssl_opts, :response]
   end
 
   @impl true
-  def init([suite, opts]) do
-    Application.ensure_all_started(:ssl)
-
+  def init(opts) do
     port = Keyword.get(opts, :port, 0)
     response = Keyword.get(opts, :response, "OK")
+    ssl_opts = Keyword.fetch!(opts, :ssl_opts)
 
-    with {:ok, listen_socket} <- :gen_tcp.listen(port, []),
+    with {:ok, listen_socket} <- :gen_tcp.listen(port, reuseaddr: true),
          {:ok, {_, port}} <- :inet.sockname(listen_socket),
          {:ok, _} <- :prim_inet.async_accept(listen_socket, -1) do
-      {:ok, %State{listen_socket: listen_socket, port: port, suite: suite, response: response}}
+      {:ok,
+       %State{listen_socket: listen_socket, port: port, ssl_opts: ssl_opts, response: response}}
     else
       error ->
         {:stop, error}
@@ -63,34 +63,34 @@ defmodule SSLTester.Server do
     pid =
       spawn_link(fn ->
         receive do
-          :start -> worker(socket, state.suite, state.response)
+          :start -> worker(socket, state.ssl_opts, state.response)
         after
           250 -> :gen_tcp.close(socket)
         end
       end)
 
-    :gen_tcp.controlling_process(socket, pid)
+    _ = :gen_tcp.controlling_process(socket, pid)
     send(pid, :start)
     {:ok, _} = :prim_inet.async_accept(listen_socket, -1)
     {:noreply, state}
   end
 
-  defp worker(socket, suite, response) do
+  defp worker(socket, ssl_opts, response) do
     case :ssl.ssl_accept(
            socket,
            [
              active: false,
-            #  sni_fun: X509.Test.Suite.sni_fun(suite),
              reuse_sessions: false
-           ] ++ log_opts(),
-           1000
+           ] ++ ssl_opts ++ log_opts(),
+           1278
          ) do
       {:ok, ssl_socket} ->
         flush(ssl_socket)
-        :ssl.send(ssl_socket, response)
+        _ = :ssl.send(ssl_socket, response)
         :ssl.close(ssl_socket)
 
-      {:error, _reason} ->
+      {:error, reason} ->
+        IO.puts("Closed socket: #{inspect(reason)}")
         :gen_tcp.close(socket)
     end
   end
