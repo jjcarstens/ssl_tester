@@ -1,4 +1,6 @@
 defmodule SSLTester.CustomSigner2Example do
+  require X509.ASN1
+
   @moduledoc """
   Build off CustomSignerExample that is more realistic
 
@@ -45,7 +47,7 @@ defmodule SSLTester.CustomSigner2Example do
     IO.puts("Client successful received \"hello\"")
   end
 
-  defp make_certs() do
+  def make_certs() do
     signer_key = X509.PrivateKey.new_ec(:secp256r1)
 
     signer_cert =
@@ -71,7 +73,7 @@ defmodule SSLTester.CustomSigner2Example do
       device_key
       |> X509.PublicKey.derive()
       |> X509.Certificate.new(
-        "/CN=ABC12345678",
+        "/CN=ABC11111111",
         signer_cert,
         signer_key
       )
@@ -82,7 +84,7 @@ defmodule SSLTester.CustomSigner2Example do
       device2_key
       |> X509.PublicKey.derive()
       |> X509.Certificate.new(
-        "/CN=Device2",
+        "/CN=ABC22222222",
         signer_cert,
         signer_key
       )
@@ -201,8 +203,9 @@ defmodule SSLTester.CustomSigner2Example do
   defp verify_pub_key(cert, :valid_peer, state) do
     IO.puts("--> verify_pub_key told of a valid peer: #{inspect(cert)}")
 
+    [id_from_cert] = X509.Certificate.subject(cert, X509.ASN1.oid(:"id-at-commonName"))
     pub_key_in_cert = X509.Certificate.public_key(cert)
-    IO.puts("Pub key in cert is #{inspect(pub_key_in_cert)}")
+    IO.puts("--> Device is #{inspect(id_from_cert)} and pubkey=#{inspect(pub_key_in_cert)}")
 
     if pub_key_in_cert in state.pinned_public_keys do
       IO.puts(" --> Known public key, so OK!")
@@ -210,16 +213,16 @@ defmodule SSLTester.CustomSigner2Example do
     else
       IO.puts(" --> Unknown public key, so check cert chain")
 
-      # Simulate looking up the AKI (Nicer way???)
-      {:Extension, _, _, {:AuthorityKeyIdentifier, aki, _, _}} =
+      # Simulate looking up the AKI and CN - perhaps grab them both out of the extension list?
+      X509.ASN1.extension(extnValue: X509.ASN1.authority_key_identifier(keyIdentifier: aki)) =
         X509.Certificate.extension(cert, :authority_key_identifier)
 
-      {:Extension, _, _, known_signer_ski} =
+      X509.ASN1.extension(extnValue: known_signer_ski) =
         X509.Certificate.extension(state.authorized_signer, :subject_key_identifier)
 
-      IO.inspect(aki, label: "aki")
-      IO.inspect(known_signer_ski, label: "known_signer_ski")
       # Do we know that the AKI signed this certificate? - Corrupt the signature to find out????
+      # NH looks up the org based on the AKI. Is this ok?
+      # It would be cool to provision this device
       if aki == known_signer_ski do
         # Save the cert in the DB, pin the public key to mark it as "trusted"
         {:valid, state}
