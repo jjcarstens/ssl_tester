@@ -195,16 +195,21 @@ defmodule SSLTester.CustomSigner2Example do
     {:unknown, state}
   end
 
-  defp verify_pub_key(cert, :valid, state) do
+  defp verify_pub_key(cert, :valid, _state) do
     IO.puts("--> verify_pub_key told of a valid cert: #{inspect(cert)}")
-    {:valid, state}
+    {:fail, :totally_not_expecting_a_valid_signer_cert}
   end
 
   defp verify_pub_key(cert, :valid_peer, state) do
     IO.puts("--> verify_pub_key told of a valid peer: #{inspect(cert)}")
 
-    [id_from_cert] = X509.Certificate.subject(cert, X509.ASN1.oid(:"id-at-commonName"))
     pub_key_in_cert = X509.Certificate.public_key(cert)
+
+    # pub_key_hash = X509.PublicKey.to_der(pub_key_in_cert) |> :crypto.hash(:sha) |> Base.encode16()
+
+    # DB lookup is on pub_key_hash. Returns device record?
+
+    [id_from_cert] = X509.Certificate.subject(cert, X509.ASN1.oid(:"id-at-commonName"))
     IO.puts("--> Device is #{inspect(id_from_cert)} and pubkey=#{inspect(pub_key_in_cert)}")
 
     if pub_key_in_cert in state.pinned_public_keys do

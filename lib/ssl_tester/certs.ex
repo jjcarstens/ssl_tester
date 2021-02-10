@@ -30,7 +30,7 @@ defmodule SSLTester.Certs do
     }
   end
 
-  def server_ssl_opts(%__MODULE__{} = certs) do
+  def server_ssl_opts(%__MODULE__{} = _certs) do
     [
       # fail_if_no_peer_cert: true,
       # verify: :verify_peer,
