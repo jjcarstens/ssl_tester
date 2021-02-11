@@ -103,11 +103,18 @@ defmodule SSLTester.Certs do
     |> X509.Certificate.from_der!()
   end
 
-  @spec cert_as_pem(t(), atom(), [atom()]) :: String.t()
+  @spec cert_as_pem(t(), atom(), [corruption()]) :: String.t()
   def cert_as_pem(certs, name, corruptions \\ []) do
     certs
     |> cert(name, corruptions)
     |> X509.Certificate.to_pem()
+  end
+
+  @spec cert_as_der(t(), atom(), [corruption()]) :: binary()
+  def cert_as_der(certs, name, corruptions \\ []) do
+    certs
+    |> cert(name, corruptions)
+    |> X509.Certificate.to_der()
   end
 
   @spec private_key(t(), atom()) :: X509.PrivateKey.t()
