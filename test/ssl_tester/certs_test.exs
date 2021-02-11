@@ -70,5 +70,28 @@ defmodule SSLTester.CertsTest do
 
     assert {:error, {:bad_cert, :cert_expired}} =
              :public_key.pkix_path_validation(signer_cert_der, [bad_cert], [])
+
+    # Both good and bad cert signatures should ok
+    signer_pubkey = Certs.cert(c, :signer) |> X509.Certificate.public_key()
+    assert :public_key.pkix_verify(X509.Certificate.to_der(good_cert), signer_pubkey)
+    assert :public_key.pkix_verify(X509.Certificate.to_der(bad_cert), signer_pubkey)
+  end
+
+  test "creates expired certs with bad signatures" do
+    c = Certs.new()
+
+    good_cert = Certs.cert(c, :device)
+    bad_cert = Certs.cert(c, :device, [:expired, :bad_signature])
+    signer_cert_der = Certs.cert_as_der(c, :signer)
+
+    assert {:ok, _} = :public_key.pkix_path_validation(signer_cert_der, [good_cert], [])
+
+    assert {:error, {:bad_cert, :cert_expired}} =
+             :public_key.pkix_path_validation(signer_cert_der, [bad_cert], [])
+
+    # The bad cert signatures should fail too
+    signer_pubkey = Certs.cert(c, :signer) |> X509.Certificate.public_key()
+    assert :public_key.pkix_verify(X509.Certificate.to_der(good_cert), signer_pubkey)
+    refute :public_key.pkix_verify(X509.Certificate.to_der(bad_cert), signer_pubkey)
   end
 end
